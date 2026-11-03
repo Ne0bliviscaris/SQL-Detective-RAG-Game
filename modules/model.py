@@ -5,7 +5,7 @@ from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from modules.database.custom_db_schema import CustomDBSchema
-from modules.settings import MODEL, OLLAMA_BASE_URL
+from modules.settings import MODEL, OLLAMA_BASE_URL, OLLAMA_CONTEXT_WINDOW
 
 
 class TranslatorResponse(BaseModel):
@@ -54,6 +54,7 @@ class Model:
                     {"role": "system", "content": self.prompt()},
                     {"role": "user", "content": self.user_input},
                 ],
+                extra_body={"options": {"num_ctx": OLLAMA_CONTEXT_WINDOW}},
                 temperature=0,
                 max_tokens=1024,
             )
