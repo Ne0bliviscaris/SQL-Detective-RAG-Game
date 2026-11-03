@@ -25,9 +25,9 @@ class CustomDBSchema:
                         "foreign_key": None,
                     },
                     {
-                        "name": "type",
+                        "name": "crime_type",
                         "type": "TEXT",
-                        "description": "Crime category. For the case, murder is exactly 'murder'; use type = 'murder'.",
+                        "description": "Crime category. For the case, murder is exactly 'murder'; use crime_type = 'murder'.",
                         "variants": [
                             "arson",
                             "assault",
