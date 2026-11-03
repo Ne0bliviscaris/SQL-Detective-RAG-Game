@@ -56,7 +56,7 @@ class Model:
                 ],
                 extra_body={"options": {"num_ctx": OLLAMA_CONTEXT_WINDOW}},
                 temperature=0,
-                max_tokens=1024,
+                max_tokens=2048,
             )
         except Exception as error:
             return f"Model Connection error. Make sure Ollama is running and {MODEL} is installed.\n{error}"
