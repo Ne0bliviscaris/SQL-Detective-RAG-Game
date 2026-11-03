@@ -1,7 +1,5 @@
 import sqlite3
 
-from langchain_community.utilities import SQLDatabase
-
 from modules.settings import DB_FILE
 
 
@@ -23,11 +21,10 @@ def convert_results_to_dict(records, column_names):
 
 
 def database_connect():
-    """Establishes a connection to the SQL database using the provided URI."""
-    db = SQLDatabase.from_uri(f"sqlite:///{DB_FILE}")
-    return db
+    """Establish a direct SQLite connection."""
+    return sqlite3.connect(DB_FILE)
 
 
 def db_without_solution():
-    """Connects to SQL database. Solution table is excluded."""
-    return SQLDatabase.from_uri(f"sqlite:///{DB_FILE}", ignore_tables=["solution"])
+    """Establish a direct SQLite connection for the investigation database."""
+    return sqlite3.connect(DB_FILE)

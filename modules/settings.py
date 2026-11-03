@@ -2,6 +2,7 @@
 # MODEL = "llama3"
 # MODEL = "zephyr:7b"
 MODEL = "deepseek-r1:1.5b"
+OLLAMA_BASE_URL = "http://localhost:11434/v1"
 # MODEL = "llama3.2:1b"
 
 # Switched to local model

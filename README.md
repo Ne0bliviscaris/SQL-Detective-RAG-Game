@@ -26,7 +26,7 @@ As a detective in SQL City, you're tasked with solving a murder that occurred on
 - **Database**: `SQLite`
 - **LLM Platform**: `Ollama`
 - **Language Model Used**: `DeepSeek-R1:1.5b`
-- **RAG Implementation**: `LangChain` for orchestration and context management
+- **Structured output**: `Instructor` with Pydantic response models
 
 ## 📂 Project Structure
 ```
@@ -91,7 +91,7 @@ python main.py
 ## 🙏 Acknowledgements
 
 - [SQL Murder Mystery](https://github.com/NUKnightLab/sql-mysteries) for the original game concept
-- [LangChain](https://langchain.com/) for the RAG framework
+- [Instructor](https://python.useinstructor.com/) for validated structured output
 - [Ollama](https://ollama.ai/) for local language model support
 - [DeepSeek](https://www.deepseek.com) for their R1:1.5b model
 - [Streamlit](https://streamlit.io/) for the interactive web interface

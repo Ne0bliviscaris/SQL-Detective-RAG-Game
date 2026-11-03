@@ -13,7 +13,7 @@ st.set_page_config(
 
 
 def title_screen():
-    st.title("SQL RAG - local Ollama - Langchain")
+    st.title("SQL RAG - local Ollama - Instructor")
     st.markdown(
         """
         ### 🔍 Welcome, Detective
