@@ -22,11 +22,6 @@ def convert_results_to_dict(records, column_names):
     return [dict(zip(column_names, row)) for row in records]
 
 
-def get_db_schema():
-    db = db_without_solution()
-    return db.get_table_info()
-
-
 def database_connect():
     """Establishes a connection to the SQL database using the provided URI."""
     db = SQLDatabase.from_uri(f"sqlite:///{DB_FILE}")

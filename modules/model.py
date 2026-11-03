@@ -6,7 +6,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_ollama import ChatOllama
 
-from modules.database.db import db_without_solution, get_db_schema
+from modules.database.custom_db_schema import CustomDBSchema
 from modules.settings import MODEL
 from modules.tools import model_answer_regex
 
@@ -40,7 +40,8 @@ class Model:
     def get_field(self, field=None):
         """Get SQL query from parsed_response."""
         if isinstance(self.full_response, dict):
-            return self.full_response.get(field)
+            requested_field = self.full_response.get(field)
+            return requested_field.replace("\\'", "'") if requested_field else None
 
         if isinstance(self.full_response, str):
             return model_answer_regex(self.full_response, field)
@@ -82,8 +83,30 @@ class Translator(Model):
         11. While using columns from multiple tables, ensure you call proper tables.
 
         
-        **Input:** {input}
+        **Input:** 
+        {input}
 
+        **Examples:**
+        "user_input": "find all theft cases from SQL City"
+        "sql_query": "SELECT * FROM crime_scene_report WHERE type = 'theft' AND city = 'SQL City';"
+        "thinking": "Identified 'theft' as the type of crime and 'SQL City' as the location."
+        "rules_followed": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11"
+        
+        "user_input": "Find who lives in the first house in Northwestern Dr"
+        "sql_query": "SELECT * FROM person WHERE address_street_name = 'Northwestern Dr' ORDER BY address_number ASC LIMIT 1;"
+        "thinking": "Identified 'Northwestern Dr' as the street and used ORDER BY address_number ASC LIMIT 1; to get only house with the highest number."
+        "rules_followed": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11"
+
+        "user_input": "find all drivers with blue eyes"
+        "sql_query": "SELECT * FROM drivers_license WHERE eye_color = 'blue';"
+        "thinking": "Identified 'blue' as the eye color found in drivers_license table."
+        "rules_followed": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11"
+
+        "user_input": "Find a person named John living in Northwestern Dr"
+        "sql_query": "SELECT * FROM person WHERE name LIKE '%John%' AND address_street_name = 'Northwestern Dr';"
+        "thinking": address_street_name identified as 'Northwestern Dr'. Name is not exact, so used LIKE operator."
+        "rules_followed": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11"
+        
         **Output:**
         ```json
         {{
@@ -100,13 +123,13 @@ class Translator(Model):
             input_variables=["input"],
             partial_variables={
                 "dialect": "sqlite",
-                "table_info": get_db_schema(),
+                "table_info": CustomDBSchema.get_table_info(),
             },
         )
 
     def build_langchain(self):
         """Builds and returns a language chain with database and Ollama connections."""
-        db = db_without_solution()
+        db = CustomDBSchema()
         llm = ChatOllama(
             temperature=0,
             seed=1,
