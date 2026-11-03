@@ -85,6 +85,10 @@ class Translator(Model):
         return f"""
         **ROLE:** You are a SQL Translator. Your task is to translate the following question into a valid SQL query. Use SQLite dialect.
 
+                **Table selection priority:**
+                - Questions about a crime, murder, police report, case file, crime date, or crime city MUST use only the `crime_scene_report` table unless the user explicitly asks for a different table.
+                - Never use `person`, `income`, or a person relationship for that question. `crime_scene_report` has no `person_id` column and is not joined to those tables.
+
         **Rules:**
         1. Ensure the output contains a valid SQL query.
         2. The query must strictly follow the provided database schema and use only the available tables and columns.
@@ -103,7 +107,7 @@ class Translator(Model):
         15. When a date is provided, put the converted integer directly in SQL, for example date = 20180203, never date = '2018-02-03'.
         16. Use the facts stated by the user as filters. Do not add a default crime, date, city, suspect, or solution that the user did not ask for.
         17. Return one query that helps answer the user's current question; do not invent a multi-step solution to the game.
-        18. ONLY return the SQL query, no explanations or markdown.
+        18. Return exactly one JSON object matching the response schema. Put the complete SQLite query in the 'sql_query' field. Do not return markdown, explanations, comments, or additional fields.
 
         **Database schema:**
         {CustomDBSchema.get_table_info()}
