@@ -10,19 +10,24 @@ class CustomDBSchema:
         schema = [
             {
                 "table_name": "crime_scene_report",
-                "description": "Contains police records of reported crimes including the date, type, description, and the city where the incident occurred.",
+                "description": "One row is one reported crime in one city on one date. Use this table for crime, murder, case, report, witness clue, city, or crime-date questions.",
+                "row_meaning": "One police report; description contains narrative clues and witness instructions.",
+                "primary_key": None,
+                "join_hints": [
+                    "No direct person_id exists; connect to people only through clues written in description."
+                ],
                 "columns": [
                     {
                         "name": "date",
                         "type": "INTEGER",
                         "format": "YYYYMMDD (8-digit integer)",
-                        "description": "Date of the crime",
+                        "description": "Date of the reported crime as an 8-digit YYYYMMDD integer. Convert a dotted or dashed date before comparing, without quotes.",
                         "foreign_key": None,
                     },
                     {
                         "name": "type",
                         "type": "TEXT",
-                        "description": "Type of the reported crime",
+                        "description": "Crime category. For the case, murder is exactly 'murder'; use type = 'murder'.",
                         "variants": [
                             "arson",
                             "assault",
@@ -39,13 +44,13 @@ class CustomDBSchema:
                     {
                         "name": "description",
                         "type": "TEXT",
-                        "description": "Narrative description of the crime scene",
+                        "description": "Free-text report narrative. Search clues with description LIKE '%text%'.",
                         "foreign_key": None,
                     },
                     {
                         "name": "city",
                         "type": "TEXT",
-                        "description": "Location - city where the crime occurred",
+                        "description": "City where the crime occurred. Use the city supplied by the user as an exact TEXT value.",
                         "foreign_key": None,
                     },
                 ],
@@ -53,9 +58,17 @@ class CustomDBSchema:
             },
             {
                 "table_name": "drivers_license",
-                "description": "Information from driving licenses, including personal attributes and vehicle data.",
+                "description": "One row is one driver's license. Contains physical description and vehicle data, not a person's name.",
+                "row_meaning": "One license record belonging to zero or one person.",
+                "primary_key": "id",
+                "join_hints": ["Join to person with person.license_id = drivers_license.id."],
                 "columns": [
-                    {"name": "id", "type": "INTEGER", "description": "Unique driver license ID", "foreign_key": None},
+                    {
+                        "name": "id",
+                        "type": "INTEGER",
+                        "description": "Unique license ID. Match it to person.license_id.",
+                        "foreign_key": None,
+                    },
                     {
                         "name": "age",
                         "type": "INTEGER",
@@ -89,7 +102,7 @@ class CustomDBSchema:
                     {
                         "name": "plate_number",
                         "type": "TEXT",
-                        "description": "License holder's car license plate number. Contains 6 alphanumeric characters",
+                        "description": "Vehicle plate number. Six alphanumeric characters; search as TEXT.",
                         "foreign_key": None,
                     },
                     {
@@ -116,21 +129,29 @@ class CustomDBSchema:
             },
             {
                 "table_name": "facebook_event_checkin",
-                "description": "Tracks when a person checked into a Facebook event.",
+                "description": "One row is one person's attendance at one Facebook event on one date. Use for event, Facebook, or checked-in questions.",
+                "row_meaning": "One event check-in by one person.",
+                "primary_key": None,
+                "join_hints": ["Join to person with facebook_event_checkin.person_id = person.id."],
                 "columns": [
                     {
                         "name": "person_id",
                         "type": "INTEGER",
-                        "description": "ID of the person who checked in",
+                        "description": "ID of the person who attended. Join to person.id.",
                         "foreign_key": "person.id",
                     },
-                    {"name": "event_id", "type": "INTEGER", "description": "ID of the event", "foreign_key": None},
+                    {
+                        "name": "event_id",
+                        "type": "INTEGER",
+                        "description": "Identifier of the event. It is not a person ID.",
+                        "foreign_key": None,
+                    },
                     {"name": "event_name", "type": "TEXT", "description": "Name of the event", "foreign_key": None},
                     {
                         "name": "date",
                         "type": "INTEGER",
                         "format": "YYYYMMDD  (8-number integer)",
-                        "description": "Date of check-in",
+                        "description": "Date of event attendance as YYYYMMDD integer.",
                         "foreign_key": None,
                     },
                 ],
@@ -145,33 +166,38 @@ class CustomDBSchema:
             },
             {
                 "table_name": "get_fit_now_check_in",
-                "description": "Logs each time a gym member checked in and out.",
+                "description": "One row is one gym visit by one member. Use for gym visits, check-in times, or alibis.",
+                "row_meaning": "One visit; the same member can have many rows.",
+                "primary_key": None,
+                "join_hints": [
+                    "Join to get_fit_now_member with get_fit_now_check_in.membership_id = get_fit_now_member.id, then to person using person_id."
+                ],
                 "columns": [
                     {
                         "name": "membership_id",
                         "type": "TEXT",
-                        "description": "Membership ID - unique identifier for gym members. Contains 6 alphanumeric characters",
+                        "description": "Gym membership identifier, usually 5 alphanumeric characters such as NL318. Join to get_fit_now_member.id.",
                         "foreign_key": "get_fit_now_member.id",
                     },
                     {
                         "name": "check_in_date",
                         "type": "INTEGER",
                         "format": "YYYYMMDD  (8-digit integer)",
-                        "description": "Date of check-in",
+                        "description": "Date of the gym visit as YYYYMMDD integer.",
                         "foreign_key": None,
                     },
                     {
                         "name": "check_in_time",
                         "type": "INTEGER",
                         "format": "minutes passed since midnight",
-                        "description": "Time of check-in",
+                        "description": "Minutes after midnight, not HHMM. 329 means 05:29. Compare numerically.",
                         "foreign_key": None,
                     },
                     {
                         "name": "check_out_time",
                         "type": "INTEGER",
                         "format": "minutes passed since midnight",
-                        "description": "Time of check-out",
+                        "description": "Minutes after midnight, not HHMM. NULL means no recorded checkout.",
                         "foreign_key": None,
                     },
                 ],
@@ -186,18 +212,23 @@ class CustomDBSchema:
             },
             {
                 "table_name": "get_fit_now_member",
-                "description": "Information about gym members, including their name, start date, and status.",
+                "description": "One row is one gym membership. Use for gym member names, membership status, or membership start dates.",
+                "row_meaning": "One membership belonging to one person.",
+                "primary_key": "id",
+                "join_hints": [
+                    "Join to person with get_fit_now_member.person_id = person.id. Join visits through get_fit_now_check_in.membership_id = get_fit_now_member.id."
+                ],
                 "columns": [
                     {
                         "name": "id",
                         "type": "TEXT",
-                        "description": "Unique gym membership ID - contains 6 alphanumeric characters",
+                        "description": "Unique gym membership ID, typically 5 alphanumeric characters such as NL318. Do not treat it as an integer.",
                         "foreign_key": None,
                     },
                     {
                         "name": "person_id",
                         "type": "INTEGER",
-                        "description": "Person ID associated with the member. Contains 5 digits",
+                        "description": "Person ID associated with this membership. Join to person.id.",
                         "foreign_key": "person.id",
                     },
                     {"name": "name", "type": "TEXT", "description": "Name of the gym member", "foreign_key": None},
@@ -211,7 +242,7 @@ class CustomDBSchema:
                     {
                         "name": "membership_status",
                         "type": "TEXT",
-                        "description": "Membership status tier",
+                        "description": "Membership tier. Known values are gold, silver, and regular.",
                         "variants": ["gold", "regular", "silver"],
                         "foreign_key": None,
                     },
@@ -233,20 +264,23 @@ class CustomDBSchema:
             },
             {
                 "table_name": "income",
-                "description": "Annual income data matched by social security number.",
+                "description": "One row is annual income for one person. There is no person_id; match this table to person using SSN.",
+                "row_meaning": "One income record identified by a social security number.",
+                "primary_key": "ssn",
+                "join_hints": ["Logical join only: income.ssn = person.ssn. Do not join income through person.id."],
                 "columns": [
                     {
                         "name": "ssn",
                         "type": "INTEGER",
                         "format": "9-digit integer",
-                        "description": "Social Security Number (unique)",
+                        "description": "Unique 9-digit social security number. Match exactly to person.ssn.",
                         "foreign_key": None,
                     },
                     {
                         "name": "annual_income",
                         "type": "INTEGER",
-                        "format": "5-digit integer",
-                        "description": "Annual income in USD",
+                        "format": "Integer amount in USD",
+                        "description": "Annual income in US dollars. It may have 5 or 6 digits; do not assume a fixed length.",
                         "foreign_key": None,
                     },
                 ],
@@ -256,18 +290,23 @@ class CustomDBSchema:
             },
             {
                 "table_name": "interview",
-                "description": "Interview transcripts linked to individuals by person ID.",
+                "description": "One row is one interview transcript for one person. Use for statements, clues, witnesses, or confessions.",
+                "row_meaning": "One interview belonging to one person.",
+                "primary_key": None,
+                "join_hints": [
+                    "Join to person with interview.person_id = person.id. Search transcript with transcript LIKE '%text%'."
+                ],
                 "columns": [
                     {
                         "name": "person_id",
                         "type": "INTEGER",
-                        "description": "ID of the person interviewed",
+                        "description": "ID of the interviewed person. Join to person.id.",
                         "foreign_key": "person.id",
                     },
                     {
                         "name": "transcript",
                         "type": "TEXT",
-                        "description": "Transcript of the interview",
+                        "description": "Full free-text interview. Search it with LIKE; it is not a structured clue field.",
                         "foreign_key": None,
                     },
                 ],
@@ -281,48 +320,75 @@ class CustomDBSchema:
                 ],
             },
             {
+                "table_name": "solution",
+                "description": "Internal game-answer table. It is empty in the investigation database and must never be queried for clues or suspects.",
+                "row_meaning": "No investigation records; zero rows.",
+                "primary_key": None,
+                "join_hints": [],
+                "columns": [
+                    {
+                        "name": "user",
+                        "type": "TEXT",
+                        "description": "Internal solution metadata; do not use.",
+                        "foreign_key": None,
+                    },
+                    {
+                        "name": "value",
+                        "type": "TEXT",
+                        "description": "Internal solution metadata; do not use.",
+                        "foreign_key": None,
+                    },
+                ],
+                "relationships": [],
+            },
+            {
                 "table_name": "person",
-                "description": "Core table of individuals connected to the case, including identifiers and personal data.",
+                "description": "One row is one person. This is the central table for names, addresses, IDs, interviews, gym memberships, events, licenses, and income.",
+                "row_meaning": "One person; use person.id as the bridge to most other tables.",
+                "primary_key": "id",
+                "join_hints": [
+                    "person.id joins to interview.person_id, facebook_event_checkin.person_id, and get_fit_now_member.person_id. person.license_id joins to drivers_license.id. person.ssn joins logically to income.ssn."
+                ],
                 "columns": [
                     {
                         "name": "id",
                         "type": "INTEGER",
                         "format": "5-digit integer",
-                        "description": "Unique person ID (identifier)",
+                        "description": "Unique person identifier. This is the main join key for a person.",
                         "foreign_key": None,
                     },
                     {
                         "name": "name",
                         "type": "TEXT",
                         "format": "2-word string, first name and surname",
-                        "description": "Full name of the person. If only one part is known, use LIKE operator and %name%.",
+                        "description": "Full name, usually first name plus surname. For a partial name use name LIKE '%fragment%'.",
                         "foreign_key": None,
                     },
                     {
                         "name": "license_id",
                         "type": "INTEGER",
                         "format": "6-digit integer",
-                        "description": "Driver's license ID (linked to drivers_license)",
+                        "description": "License ID. Join to drivers_license.id; do not confuse it with person.id.",
                         "foreign_key": "drivers_license.id",
                     },
                     {
                         "name": "address_number",
                         "type": "INTEGER",
                         "format": "4 or less digits",
-                        "description": "Person's street house address number",
+                        "description": "House number. It is numeric, so use MAX/MIN or ORDER BY address_number for last/first house.",
                         "foreign_key": None,
                     },
                     {
                         "name": "address_street_name",
                         "type": "TEXT",
-                        "description": "Name of the street person's house is located on",
+                        "description": "Street name without the house number. Filter exact names such as 'Franklin Ave' or 'Northwestern Dr'.",
                         "foreign_key": None,
                     },
                     {
                         "name": "ssn",
                         "type": "INTEGER",
                         "format": "9-digit integer",
-                        "description": "Social Security Number (used to match with income)",
+                        "description": "9-digit social security number. Logical join to income.ssn; not a foreign key in SQLite.",
                         "foreign_key": None,
                     },
                 ],
@@ -355,4 +421,4 @@ class CustomDBSchema:
                 ],
             },
         ]
-        return json.dumps(schema, indent=2)
+        return json.dumps(schema, separators=(",", ":"))
