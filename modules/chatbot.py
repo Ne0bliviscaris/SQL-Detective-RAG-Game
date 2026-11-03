@@ -97,7 +97,6 @@ def execute_query():
     current_index = st.session_state.index - 1
     generated_sql_query = st.session_state.context["sql_queries"][current_index]
     if generated_sql_query is None:
-        print("No SQL query to execute. Please rephrase your question.\n")
         st.session_state.current_state = None
         return
 
