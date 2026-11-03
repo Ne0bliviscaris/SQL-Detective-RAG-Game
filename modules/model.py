@@ -1,11 +1,13 @@
+import re
+import sqlite3
 from typing import ClassVar
 
 import instructor
 from openai import OpenAI
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from modules.database.custom_db_schema import CustomDBSchema
-from modules.settings import MODEL, OLLAMA_BASE_URL, OLLAMA_CONTEXT_WINDOW
+from modules.settings import DB_FILE, MODEL, OLLAMA_BASE_URL, OLLAMA_CONTEXT_WINDOW
 
 
 class TranslatorResponse(BaseModel):
@@ -14,6 +16,41 @@ class TranslatorResponse(BaseModel):
     sql_query: str = Field(description="A valid SQLite query matching the user's request.")
     # thinking: str = Field(description="Brief reasoning behind the SQL query.")
     # rules_followed: str = Field(description="Comma-separated rule numbers followed.")
+
+    @field_validator("sql_query")
+    @classmethod
+    def validate_sql_query(cls, value: str) -> str:
+        """Reject non-read-only or non-compiling SQL before it reaches the UI."""
+        query = value.strip()
+        if not query:
+            print("field_validator: sql_query: SQL query is empty.")
+            raise ValueError("sql_query cannot be empty")
+
+        if "```" in query:
+            print("field_validator: sql_query: SQL query contains markdown fences.")
+            raise ValueError("sql_query must not contain markdown fences")
+
+        first_keyword = re.match(r"^([A-Za-z]+)\b", query)
+        if first_keyword is None or first_keyword.group(1).upper() not in {"SELECT", "WITH"}:
+            print("field_validator: sql_query: SQL query is not read-only.")
+            raise ValueError("sql_query must be a read-only SELECT or WITH query")
+
+        if re.search(
+            r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|TRUNCATE|ATTACH|DETACH|PRAGMA|VACUUM)\b",
+            query,
+            re.IGNORECASE,
+        ):
+            print("field_validator: sql_query: SQL query contains a forbidden write or database command.")
+            raise ValueError("sql_query contains a forbidden write or database command")
+
+        try:
+            with sqlite3.connect(DB_FILE) as connection:
+                connection.execute(f"EXPLAIN {query}")
+        except sqlite3.Error as error:
+            print(f"field_validator: sql_query: SQL query failed to compile. Error: {error}")
+            raise ValueError(f"sql_query is not valid for the database: {error}") from error
+
+        return query
 
 
 class DetectiveResponse(BaseModel):
@@ -54,9 +91,10 @@ class Model:
                     {"role": "system", "content": self.prompt()},
                     {"role": "user", "content": self.user_input},
                 ],
+                max_retries=2,
                 extra_body={"options": {"num_ctx": OLLAMA_CONTEXT_WINDOW}},
                 temperature=0,
-                max_tokens=2048,
+                max_tokens=8192,
             )
         except Exception as error:
             return f"Model Connection error. Make sure Ollama is running and {MODEL} is installed.\n{error}"
