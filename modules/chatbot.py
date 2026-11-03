@@ -94,15 +94,21 @@ def translate_question():
 
 def execute_query():
     """Execute SQL query and return results."""
+    current_index = st.session_state.index - 1
+    generated_sql_query = st.session_state.context["sql_queries"][current_index]
+    if generated_sql_query is None:
+        print("No SQL query to execute. Please rephrase your question.\n")
+        st.session_state.current_state = None
+        return
+
     with st.spinner("Executing SQL query..."):
-        current_index = st.session_state.index - 1
         query = st.session_state.context["sql_queries"][current_index]
         try:
             query_results = execute_sql_query(query)
             update_context("query_results", query_results, current_index)
             st.session_state.current_state = "detective"
         except Exception as e:
-            print(f"Error executing translated query.\nRephrase the question and try again.\nError message: {e}")
+            print(f"Error executing translated query. Rephrase the question and try again.\n- Error message: {e}")
             st.session_state.current_state = None
 
         st.rerun()
