@@ -4,6 +4,7 @@ from typing import ClassVar
 
 import instructor
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel, Field, field_validator
 
 from modules.database.custom_db_schema import CustomDBSchema
@@ -26,9 +27,22 @@ class TranslatorResponse(BaseModel):
             print("field_validator: sql_query: SQL query is empty.")
             raise ValueError("sql_query cannot be empty")
 
+        print(f"field_validator: sql_query: Validating SQL query:\\n{query}")
         if "```" in query:
             print("field_validator: sql_query: SQL query contains markdown fences.")
             raise ValueError("sql_query must not contain markdown fences")
+
+        if re.search(
+            r"\bdate\s*=\s*['\"](?:\d{8}|\d{4}[-.]\d{2}[-.]\d{2})['\"]",
+            query,
+            re.IGNORECASE,
+        ):
+            print("field_validator: sql_query: Date must be an unquoted YYYYMMDD integer.")
+            raise ValueError("date filters must use an unquoted YYYYMMDD integer")
+
+        if re.search(r"\bdescription\s*=\s*(?:NULL|'NULL'|\"NULL\")", query, re.IGNORECASE):
+            print("field_validator: sql_query: SQL query contains an invented NULL description filter.")
+            raise ValueError("description must not be filtered with NULL unless explicitly requested")
 
         first_keyword = re.match(r"^([A-Za-z]+)\b", query)
         if first_keyword is None or first_keyword.group(1).upper() not in {"SELECT", "WITH"}:
@@ -84,24 +98,45 @@ class Model:
                 OpenAI(base_url=OLLAMA_BASE_URL, api_key="ollama"),
                 mode=instructor.Mode.JSON,
             )
-            return client.chat.completions.create(
-                model=MODEL,
-                response_model=self.response_model,
-                messages=[
-                    {"role": "system", "content": self.prompt()},
-                    {"role": "user", "content": self.user_input},
-                ],
-                max_retries=2,
-                extra_body={"options": {"num_ctx": OLLAMA_CONTEXT_WINDOW}},
-                temperature=0,
-                max_tokens=8192,
-            )
         except Exception as error:
             return f"Model Connection error. Make sure Ollama is running and {MODEL} is installed.\n{error}"
 
+        retry_feedback = None
+
+        for attempt in range(2):
+            messages: list[ChatCompletionMessageParam] = [
+                {"role": "system", "content": self.prompt()},
+                {"role": "user", "content": self.user_input},
+            ]
+            if retry_feedback:
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": (
+                            "The previous response failed validation. Correct only the reported problem "
+                            f"and return the complete response again. Validation error: {retry_feedback}"
+                        ),
+                    }
+                )
+
+            try:
+                return client.chat.completions.create(
+                    model=MODEL,
+                    response_model=self.response_model,
+                    messages=messages,
+                    max_retries=0,
+                    extra_body={"options": {"num_ctx": OLLAMA_CONTEXT_WINDOW}},
+                    temperature=0,
+                    max_tokens=1024,
+                )
+            except Exception as error:
+                retry_feedback = str(error)
+
+        return f"Model Connection error. Make sure Ollama is running and {MODEL} is installed.\n{retry_feedback}"
+
     def get_field(self, field=None):
         """Get a field from the validated response model."""
-        if isinstance(self.full_response, BaseModel):
+        if field is not None and isinstance(self.full_response, BaseModel):
             return getattr(self.full_response, field, None)
         return None
 
@@ -141,11 +176,13 @@ class Translator(Model):
         11. All dates are INTEGER values in YYYYMMDD format, without quotes. Convert dates written as YYYY.MM.DD or YYYY-MM-DD to YYYYMMDD.
         12. Gym check-in and check-out times are INTEGER minutes after midnight, not HHMM. Compare them numerically.
         13. Search free text with LIKE and percent wildcards, for example transcript LIKE '%keyword%'.
-        14. When the user asks about a crime, murder, police report, or case file, use crime_scene_report. This table has only date, type, description, and city; never use person_id with it.
+        14. When the user asks about a crime, murder, police report, or case file, use crime_scene_report. Its columns are date, crime_type, description, and city; use crime_type = 'murder' for murder reports.
         15. When a date is provided, put the converted integer directly in SQL, for example date = 20180203, never date = '2018-02-03'.
-        16. Use the facts stated by the user as filters. Do not add a default crime, date, city, suspect, or solution that the user did not ask for.
-        17. Return one query that helps answer the user's current question; do not invent a multi-step solution to the game.
-        18. Return exactly one JSON object matching the response schema. Put the complete SQLite query in the 'sql_query' field. Do not return markdown, explanations, comments, or additional fields.
+        16. Use only facts explicitly stated by the user as WHERE conditions. Do not add inferred or default filters, even if they seem likely.
+        17. A request to show a report or information does not filter the description. Never add description = NULL, description = 'NULL', or an exact description condition unless the user explicitly supplied that description as a filter.
+        18. NULL means a missing database value, not text to search for. Never invent NULL conditions.
+        19. Return one query that helps answer the user's current question; do not invent a multi-step solution to the game.
+        20. Return exactly one JSON object matching the response schema. Put the complete SQLite query in the 'sql_query' field. Do not return markdown, explanations, comments, or additional fields.
 
         **Database schema:**
         {CustomDBSchema.get_table_info()}
