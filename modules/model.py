@@ -7,16 +7,15 @@ from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel, Field, field_validator
 
-from modules.database.custom_db_schema import CustomDBSchema
+# from modules.database.custom_db_schema import CustomDBSchema
+from modules.database.db import get_db_schema
 from modules.settings import DB_FILE, MODEL, OLLAMA_BASE_URL, OLLAMA_CONTEXT_WINDOW
 
 
 class TranslatorResponse(BaseModel):
     """Structured response returned by the SQL translator."""
 
-    sql_query: str = Field(description="A valid SQLite query matching the user's request.")
-    # thinking: str = Field(description="Brief reasoning behind the SQL query.")
-    # rules_followed: str = Field(description="Comma-separated rule numbers followed.")
+    sql_query: str = Field(description="A valid SQLite query using only filters explicitly stated by the user.")
 
     @field_validator("sql_query")
     @classmethod
@@ -185,8 +184,9 @@ class Translator(Model):
         20. Return exactly one JSON object matching the response schema. Put the complete SQLite query in the 'sql_query' field. Do not return markdown, explanations, comments, or additional fields.
 
         **Database schema:**
-        {CustomDBSchema.get_table_info()}
+        {get_db_schema()}
 """
+        # {CustomDBSchema.get_table_info()}
 
 
 class Detective(Model):
