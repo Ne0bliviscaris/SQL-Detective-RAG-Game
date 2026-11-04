@@ -25,6 +25,17 @@ def database_connect():
     return sqlite3.connect(DB_FILE)
 
 
-def db_without_solution():
-    """Establish a direct SQLite connection for the investigation database."""
-    return sqlite3.connect(DB_FILE)
+def get_db_schema():
+    """Return the SQLite schema visible to a player, excluding the solution table."""
+    with database_connect() as db_connection:
+        tables = db_connection.execute(
+            """
+            SELECT name, sql
+            FROM sqlite_master
+            WHERE type = 'table' AND name != ?
+            ORDER BY name
+            """,
+            ("solution",),
+        ).fetchall()
+
+    return "\n\n".join(create_statement for _, create_statement in tables)
