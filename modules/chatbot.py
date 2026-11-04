@@ -104,6 +104,10 @@ def execute_query():
         query = st.session_state.context["sql_queries"][current_index]
         try:
             query_results = execute_sql_query(query)
+            if not query_results:
+                st.session_state.current_state = None
+                return
+
             update_context("query_results", query_results, current_index)
             st.session_state.current_state = "detective"
         except Exception as e:
